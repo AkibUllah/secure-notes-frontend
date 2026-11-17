@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' http://localhost:3000 http://127.0.0.1:3000 https://*.onrender.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <title>Secure Notes</title>
+  <style>
+    body { font-family: sans-serif; max-width: 960px; margin: 0 auto; padding: 1rem; }
+    nav button, .pager button { margin-right: .3rem; }
+    nav button.active { font-weight: bold; }
+    section { border: 1px solid #ccc; padding: .75rem; margin: .75rem 0; }
+    input, textarea, select { display: block; margin: .25rem 0 .5rem; width: 100%; max-width: 420px; box-sizing: border-box; }
+    textarea { min-height: 4rem; }
+    .item { border-bottom: 1px solid #eee; padding: .5rem 0; }
+    .muted { color: #666; font-size: .85rem; }
+    .error { color: #b00; }
+    .ok { color: #070; }
+    .hidden { display: none; }
+    .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .row > form { flex: 1; min-width: 260px; }
+  </style>
+</head>
+<body>
+  <h1>Secure Notes</h1>
+  <p id="status" aria-live="polite"></p>
+
+  <!-- Logged out -->
+  <div id="auth-view" class="row">
+    <form id="login-form">
+      <h2>Login</h2>
+      <label>Email <input name="email" type="email" required></label>
+      <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
+      <button>Login</button>
+    </form>
+    <form id="register-form">
+      <h2>Register</h2>
+      <label>Name <input name="name" required maxlength="100"></label>
+      <label>Email <input name="email" type="email" required></label>
+      <label>Password (min 8) <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+      <label>Interests (comma separated) <input name="interests" placeholder="chess, reading"></label>
+      <button>Register</button>
+    </form>
+  </div>
+
+  <!-- Logged in -->
+  <div id="app-view" class="hidden">
+    <p>Signed in as <strong id="me-name"></strong> (<span id="me-role"></span>) <button id="logout">Logout</button></p>
+    <nav id="tabs">
+      <button data-tab="notes">My notes</button>
+      <button data-tab="posts">Posts</button>
+      <button data-tab="interests">Interests</button>
+      <button data-tab="profile">Profile</button>
+      <button data-tab="admin-users" class="admin-only">Admin: users</button>
+      <button data-tab="admin-notes" class="admin-only">Admin: all notes</button>
+    </nav>
+
+    <section id="tab-notes" class="tab">
+      <h2>My notes</h2>
+      <form id="note-form">
+        <input type="hidden" name="id">
+        <label>Title <input name="title" required maxlength="200"></label>
+        <label>Content <textarea name="content"></textarea></label>
+        <button>Save note</button> <button type="button" id="note-cancel" class="hidden">Cancel edit</button>
+      </form>
+      <div id="notes-list"></div>
+      <div class="pager" id="notes-pager"></div>
+    </section>
+
+    <section id="tab-posts" class="tab">
+      <h2>Posts (public)</h2>
+      <form id="post-form">
+        <input type="hidden" name="id">
+        <label>Title <input name="title" required maxlength="200"></label>
+        <label>Content <textarea name="content"></textarea></label>
+        <button>Save post</button> <button type="button" id="post-cancel" class="hidden">Cancel edit</button>
+      </form>
+      <p><button id="posts-all">All posts</button> <button id="posts-mine">My posts</button>
+        <span class="muted">(click an author name to see all of their posts — $lookup aggregation)</span></p>
+      <h3 id="posts-title">All posts</h3>
+      <div id="posts-list"></div>
+      <div class="pager" id="posts-pager"></div>
+    </section>
+
+    <section id="tab-interests" class="tab">
+      <h2>Users grouped by interest</h2>
+      <form id="interest-filter">
+        <label>Filter by one interest (optional) <input name="interest" placeholder="chess"></label>
+        <button>Apply</button>
+      </form>
+      <div id="interests-list"></div>
+      <div class="pager" id="interests-pager"></div>
+    </section>
+
+    <section id="tab-profile" class="tab">
+      <h2>My profile</h2>
+      <form id="profile-form">
+        <label>Name <input name="name" required maxlength="100"></label>
+        <label>Interests (comma separated) <input name="interests"></label>
+        <label>New password (optional) <input name="password" type="password" minlength="8" autocomplete="new-password"></label>
+        <label>Current password (required to change password) <input name="currentPassword" type="password" autocomplete="current-password"></label>
+        <button>Update profile</button>
+      </form>
+    </section>
+
+    <section id="tab-admin-users" class="tab">
+      <h2>Manage users</h2>
+      <form id="user-form">
+        <input type="hidden" name="id">
+        <label>Name <input name="name" maxlength="100"></label>
+        <label>Email <input name="email" type="email"></label>
+        <label>Password <span class="muted">(required for new users, optional when editing)</span> <input name="password" type="password" autocomplete="new-password"></label>
+        <label>Role <select name="role"><option value="user">user</option><option value="admin">admin</option></select></label>
+        <label>Interests (comma separated) <input name="interests"></label>
+        <button>Save user</button> <button type="button" id="user-cancel" class="hidden">Cancel edit</button>
+      </form>
+      <div id="users-list"></div>
+      <div class="pager" id="users-pager"></div>
+    </section>
+
+    <section id="tab-admin-notes" class="tab">
+      <h2>Everyone's notes</h2>
+      <form id="admin-notes-filter">
+        <label>Owner user id (optional) <input name="owner"></label>
+        <button>Apply</button>
+      </form>
+      <div id="admin-notes-list"></div>
+      <div class="pager" id="admin-notes-pager"></div>
+    </section>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
